@@ -2,10 +2,17 @@
 // deno-lint-ignore no-explicit-any
 export type PatternEventCallback = (event: string, ...args: any[]) => void | Promise<void>;
 
+interface IEventRegistration {
+  event: string;
+  regex: RegExp;
+  callback: PatternEventCallback;
+  count?: number;
+}
+
 
 export class PatternEventEmitter {
 
-  private eventRegistrations: [RegExp, PatternEventCallback, number?][] = [];
+  private eventRegistrations: IEventRegistration[] = [];
 
 
   constructor(private sequential = false) {
@@ -27,26 +34,40 @@ export class PatternEventEmitter {
 
 
   public on(event: string, callback: PatternEventCallback) {
-    this.eventRegistrations.push([
-      this.makeRegExpFromEvent(event),
+    this.eventRegistrations.push({
+      event,
+      regex: this.makeRegExpFromEvent(event),
       callback,
-    ]);
+    });
   }
 
   public once(event: string, callback: PatternEventCallback) {
-    this.eventRegistrations.push([
-      this.makeRegExpFromEvent(event),
+    this.eventRegistrations.push({
+      event,
+      regex: this.makeRegExpFromEvent(event),
       callback,
-      1,
-    ]);
+      count: 1,
+    });
   }
 
   public times(event: string, count: number, callback: PatternEventCallback) {
-    this.eventRegistrations.push([
-      this.makeRegExpFromEvent(event),
+    this.eventRegistrations.push({
+      event,
+      regex: this.makeRegExpFromEvent(event),
       callback,
       count,
-    ]);
+    });
+  }
+
+  public clearEvent(event: string) {
+    this.eventRegistrations = this.eventRegistrations.filter(it => !it.regex.test(event));
+  }
+
+  public clearCallback(callback: PatternEventCallback) {
+    this.eventRegistrations.splice(
+      this.eventRegistrations.findIndex(it => it.callback === callback),
+      1,
+    );
   }
 
   // deno-lint-ignore no-explicit-any
@@ -55,17 +76,17 @@ export class PatternEventEmitter {
 
       const registration = this.eventRegistrations[i];
 
-      if (!registration[0].test(event)) {
+      if (!registration.regex.test(event)) {
         continue;
       }
 
 
       try {
         if (this.sequential) {
-          await registration[1](event, ...args);
+          await registration.callback(event, ...args);
         }
         else {
-          registration[1](event, ...args);
+          registration.callback(event, ...args);
         }
       }
       catch (error) {
@@ -73,11 +94,11 @@ export class PatternEventEmitter {
       }
 
 
-      if (registration[2] !== undefined) {
+      if (registration.count !== undefined) {
 
-        registration[2]--;
+        registration.count--;
 
-        if (!( registration[2] > 0 )) {
+        if (!( registration.count > 0 )) {
           this.eventRegistrations.splice(i, 1);
         }
 
