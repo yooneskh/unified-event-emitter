@@ -72,9 +72,7 @@ export class PatternEventEmitter {
 
   // deno-lint-ignore no-explicit-any
   public async emit(event: string, ...args: any[]) {
-    for (let i = this.eventRegistrations.length - 1; i >= 0; i--) {
-
-      const registration = this.eventRegistrations[i];
+    for (const registration of [...this.eventRegistrations]) {
 
       if (!registration.regex.test(event)) {
         continue;
@@ -99,7 +97,10 @@ export class PatternEventEmitter {
         registration.count--;
 
         if (!( registration.count > 0 )) {
-          this.eventRegistrations.splice(i, 1);
+          this.eventRegistrations.splice(
+            this.eventRegistrations.indexOf(registration),
+            1
+          );
         }
 
       }
